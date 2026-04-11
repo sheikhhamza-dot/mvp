@@ -103,7 +103,7 @@ def process_message(
         system_prompt=system_prompt,
         messages=history_messages,
         temperature=0.75,
-        max_tokens=300,
+        max_tokens=100,
     )
 
     # Safety check

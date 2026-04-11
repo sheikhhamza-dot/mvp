@@ -12,28 +12,40 @@ import Link from 'next/link'
 type SessionState = 'topic_select' | 'starting' | 'active' | 'ending' | 'done'
 
 const MAX_SESSION_MINUTES = 15
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-// TTS helper
-function speak(text: string, onEnd?: () => void) {
-  if (typeof window === 'undefined' || !window.speechSynthesis) {
-    onEnd?.()
-    return
+// Module-level audio ref so cleanup works across renders
+let _currentAudio: HTMLAudioElement | null = null
+
+async function speakEdgeTTS(text: string, onEnd?: () => void): Promise<void> {
+  // Stop any currently playing audio
+  if (_currentAudio) {
+    _currentAudio.pause()
+    _currentAudio.src = ''
+    _currentAudio = null
   }
-  window.speechSynthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.lang = 'en-US'
-  utterance.rate = 0.9
-  utterance.pitch = 1.1
-  // Prefer a female voice
-  const voices = window.speechSynthesis.getVoices()
-  const femaleVoice = voices.find(v =>
-    (v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Karen') || v.name.includes('Victoria') || v.name.includes('Zira'))
-    && v.lang.startsWith('en')
-  )
-  if (femaleVoice) utterance.voice = femaleVoice
-  utterance.onend = () => onEnd?.()
-  utterance.onerror = () => onEnd?.()
-  window.speechSynthesis.speak(utterance)
+  try {
+    const res = await fetch(`${API_URL}/api/tts?text=${encodeURIComponent(text)}`)
+    if (!res.ok) throw new Error(`TTS ${res.status}`)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const audio = new Audio(url)
+    _currentAudio = audio
+    audio.onended = () => {
+      URL.revokeObjectURL(url)
+      _currentAudio = null
+      onEnd?.()
+    }
+    audio.onerror = () => {
+      URL.revokeObjectURL(url)
+      _currentAudio = null
+      onEnd?.()
+    }
+    await audio.play()
+  } catch {
+    // If TTS fails, don't block — just re-enable the mic
+    onEnd?.()
+  }
 }
 
 export default function SessionPage() {
@@ -60,12 +72,8 @@ export default function SessionPage() {
     if (!getToken()) { router.push('/login'); return }
     api.children.get(childId).then(setChild).catch(console.error)
 
-    // Load voices (required in some browsers)
-    window.speechSynthesis?.getVoices()
-    window.speechSynthesis?.addEventListener('voiceschanged', () => {})
-
     return () => {
-      window.speechSynthesis?.cancel()
+      if (_currentAudio) { _currentAudio.pause(); _currentAudio = null }
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [childId, router])
@@ -94,7 +102,7 @@ export default function SessionPage() {
   const playAiResponse = useCallback((text: string) => {
     setIsAiSpeaking(true)
     setIsMicDisabled(true)
-    speak(text, () => {
+    speakEdgeTTS(text, () => {
       setIsAiSpeaking(false)
       setIsMicDisabled(false)
     })
@@ -124,7 +132,6 @@ export default function SessionPage() {
       addMessage('ai', result.response)
       setSessionPhase(result.metadata.session_phase)
 
-      // Show quiz overlay when entering quiz phase
       if (result.metadata.session_phase === 'quiz' && sessionPhase !== 'quiz') {
         setShowQuiz(true)
       }
@@ -139,7 +146,7 @@ export default function SessionPage() {
   const handleEndSession = async (reason = 'child_ended') => {
     if (!sessionId || sessionState === 'ending' || sessionState === 'done') return
     setSessionState('ending')
-    window.speechSynthesis?.cancel()
+    if (_currentAudio) { _currentAudio.pause(); _currentAudio = null }
     if (timerRef.current) clearInterval(timerRef.current)
 
     try {
@@ -225,7 +232,6 @@ export default function SessionPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Timer */}
           <span className="text-xs text-gray-400">
             {Math.floor(elapsedMinutes)}:{String(Math.floor((elapsedMinutes % 1) * 60)).padStart(2, '0')} / {MAX_SESSION_MINUTES}m
           </span>

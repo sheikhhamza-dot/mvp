@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
+import { getToken } from '@/lib/api'
 
 type State = 'idle' | 'listening' | 'processing'
 
@@ -9,100 +10,152 @@ interface Props {
   disabled?: boolean
 }
 
-declare global {
-  interface Window {
-    SpeechRecognition: any
-    webkitSpeechRecognition: any
-  }
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function MicrophoneButton({ onTranscript, disabled }: Props) {
   const [state, setState] = useState<State>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [interim, setInterim] = useState('')
-  const recognitionRef = useRef<any>(null)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
 
-  const isSupported =
-    typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // When parent re-enables the mic after AI finishes speaking, reset from 'processing' → 'idle'
+  // When parent re-enables the mic after Lily finishes speaking,
+  // reset from 'processing' back to 'idle'
   useEffect(() => {
     if (!disabled && state === 'processing') {
       setState('idle')
     }
   }, [disabled])
 
+  // Cleanup on unmount
   useEffect(() => {
-    return () => recognitionRef.current?.stop()
+    return () => stopRecording(false)
   }, [])
 
-  const startListening = useCallback(() => {
-    if (!isSupported) {
-      setError('Voice not supported in this browser. Please use Chrome or Edge.')
+  const stopRecording = useCallback((sendAudio = true) => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    setRecordingSeconds(0)
+
+    const recorder = mediaRecorderRef.current
+    if (!recorder) return
+
+    if (sendAudio) {
+      recorder.stop() // triggers onstop → sendToWhisper
+    } else {
+      recorder.ondataavailable = null
+      recorder.onstop = null
+      recorder.stop()
+      streamRef.current?.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+      mediaRecorderRef.current = null
+      chunksRef.current = []
+    }
+  }, [])
+
+  const sendToWhisper = useCallback(async (audioBlob: Blob) => {
+    setState('processing')
+    setError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', audioBlob, 'recording.webm')
+
+      const res = await fetch(`${API_URL}/api/sessions/transcribe`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Transcription failed' }))
+        throw new Error(err.detail || `Error ${res.status}`)
+      }
+
+      const data = await res.json()
+      const transcript = (data.transcript || '').trim()
+
+      if (!transcript) {
+        setError('No speech detected. Try again!')
+        setState('idle')
+        return
+      }
+
+      onTranscript(transcript)
+      // state resets to 'idle' via the disabled→false effect after Lily speaks
+    } catch (e: any) {
+      setError(e.message || 'Something went wrong. Please try again.')
+      setState('idle')
+    }
+  }, [onTranscript])
+
+  const startListening = useCallback(async () => {
+    setError(null)
+    setRecordingSeconds(0)
+    chunksRef.current = []
+
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      setError('Microphone permission denied. Please allow microphone access.')
       return
     }
-    setError(null)
-    setInterim('')
+    streamRef.current = stream
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    const recognition = new SpeechRecognition()
-    recognitionRef.current = recognition
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm')
+      ? 'audio/webm'
+      : 'audio/ogg'
 
-    recognition.continuous = false
-    recognition.interimResults = true
-    recognition.lang = 'en-US'
-    recognition.maxAlternatives = 1
+    const recorder = new MediaRecorder(stream, { mimeType })
+    mediaRecorderRef.current = recorder
 
-    recognition.onstart = () => setState('listening')
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data)
+    }
 
-    recognition.onresult = (event: any) => {
-      let interimText = ''
-      let finalText = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript
-        if (event.results[i].isFinal) {
-          finalText += transcript
-        } else {
-          interimText += transcript
+    recorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop())
+      streamRef.current = null
+      mediaRecorderRef.current = null
+
+      const audioBlob = new Blob(chunksRef.current, { type: mimeType })
+      chunksRef.current = []
+
+      if (audioBlob.size < 500) {
+        setError('No audio recorded. Try again!')
+        setState('idle')
+        return
+      }
+      sendToWhisper(audioBlob)
+    }
+
+    recorder.start(250) // collect in 250ms chunks
+    setState('listening')
+
+    // Rolling timer — auto-stop at 30s
+    timerRef.current = setInterval(() => {
+      setRecordingSeconds(s => {
+        if (s >= 29) {
+          stopRecording(true)
+          return 0
         }
-      }
-      if (interimText) setInterim(interimText)
-      if (finalText) {
-        setState('processing')
-        setInterim('')
-        onTranscript(finalText.trim())
-      }
-    }
-
-    recognition.onerror = (event: any) => {
-      setState('idle')
-      if (event.error === 'not-allowed') {
-        setError('Microphone permission denied. Please allow microphone access.')
-      } else if (event.error === 'no-speech') {
-        setError('No speech detected. Try again!')
-      } else if (event.error !== 'aborted') {
-        setError('Something went wrong. Please try again.')
-      }
-    }
-
-    recognition.onend = () => {
-      if (state === 'listening') setState('idle')
-    }
-
-    recognition.start()
-  }, [isSupported, onTranscript, state])
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop()
-    setState('idle')
-    setInterim('')
-  }, [])
+        return s + 1
+      })
+    }, 1000)
+  }, [sendToWhisper, stopRecording])
 
   const handleClick = () => {
     if (disabled || state === 'processing') return
     if (state === 'listening') {
-      stopListening()
+      stopRecording(true)
     } else {
       startListening()
     }
@@ -123,9 +176,9 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
             'bg-gray-400 cursor-not-allowed',
           disabled && 'bg-gray-300 cursor-not-allowed opacity-60',
         )}
-        aria-label={state === 'listening' ? 'Stop listening' : 'Start speaking'}
+        aria-label={state === 'listening' ? 'Stop recording' : 'Start speaking'}
       >
-        {/* Pulse rings when listening */}
+        {/* Pulse rings when recording */}
         {state === 'listening' && (
           <>
             <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-40" />
@@ -133,7 +186,6 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
           </>
         )}
 
-        {/* Icon */}
         <span className="relative flex items-center justify-center h-full">
           {state === 'processing' ? (
             <svg className="w-8 h-8 text-white animate-spin" fill="none" viewBox="0 0 24 24">
@@ -148,7 +200,6 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
         </span>
       </button>
 
-      {/* State label */}
       <p className={cn(
         'text-sm font-medium',
         state === 'idle' && 'text-gray-500',
@@ -156,18 +207,10 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
         state === 'processing' && 'text-blue-500',
       )}>
         {state === 'idle' && (disabled ? 'Wait for Lily...' : 'Tap to speak')}
-        {state === 'listening' && 'Listening...'}
+        {state === 'listening' && `Recording... ${recordingSeconds}s`}
         {state === 'processing' && 'Thinking...'}
       </p>
 
-      {/* Interim transcript */}
-      {interim && (
-        <p className="text-xs text-gray-400 italic max-w-xs text-center">
-          "{interim}"
-        </p>
-      )}
-
-      {/* Error message */}
       {error && (
         <p className="text-xs text-red-500 max-w-xs text-center">{error}</p>
       )}

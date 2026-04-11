@@ -1,5 +1,7 @@
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+import os
+from groq import Groq as GroqClient
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from models.schemas import (
     SessionStart, SessionStartResponse, SessionPlan,
     MessageRequest, MessageResponse, MessageMetadata,
@@ -240,3 +242,33 @@ async def get_report(session_id: str, user_id: str = Depends(get_current_user_id
         "topic": session.get("topic", ""),
         **report,
     }
+
+
+@router.post("/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Accept a WebM/WAV audio blob, transcribe via Groq Whisper, return transcript."""
+    allowed = {"audio/webm", "audio/wav", "audio/ogg", "audio/mp4", "audio/mpeg"}
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=415, detail=f"Unsupported audio type: {file.content_type}")
+
+    audio_bytes = await file.read()
+    if len(audio_bytes) < 500:
+        raise HTTPException(status_code=400, detail="Audio too short or empty")
+    if len(audio_bytes) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Audio too large (max 25 MB)")
+
+    try:
+        client = GroqClient(api_key=os.environ["GROQ_API_KEY"])
+        result = client.audio.transcriptions.create(
+            model="whisper-large-v3-turbo",
+            file=(file.filename or "audio.webm", audio_bytes),
+            language="en",
+            response_format="text",
+        )
+        return {"transcript": result.strip()}
+    except Exception as e:
+        logger.error("Whisper transcription error: %s", e)
+        raise HTTPException(status_code=500, detail="Transcription failed")
