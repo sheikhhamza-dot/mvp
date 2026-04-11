@@ -26,6 +26,13 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
     typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
 
+  // When parent re-enables the mic after AI finishes speaking, reset from 'processing' → 'idle'
+  useEffect(() => {
+    if (!disabled && state === 'processing') {
+      setState('idle')
+    }
+  }, [disabled])
+
   useEffect(() => {
     return () => recognitionRef.current?.stop()
   }, [])

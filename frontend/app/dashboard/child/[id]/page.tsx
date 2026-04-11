@@ -75,7 +75,7 @@ export default function ChildProgressPage() {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-800">{child.total_vocab_count}</p>
-              <p className="text-xs text-gray-400">Words Learned</p>
+              <p className="text-xs text-gray-400">Words Introduced</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-800">{formatDuration(child.total_speaking_minutes)}</p>

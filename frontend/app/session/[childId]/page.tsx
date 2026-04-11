@@ -190,7 +190,7 @@ export default function SessionPage() {
           <div className="grid grid-cols-2 gap-3 mb-6">
             <div className="bg-blue-50 rounded-xl p-3">
               <p className="text-2xl font-bold text-blue-600">{endResult.vocab_introduced?.length || 0}</p>
-              <p className="text-xs text-gray-400">New words</p>
+              <p className="text-xs text-gray-400">Words introduced</p>
             </div>
             <div className="bg-purple-50 rounded-xl p-3">
               <p className="text-2xl font-bold text-purple-600">{Math.round(endResult.duration_minutes || 0)}m</p>

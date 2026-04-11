@@ -109,8 +109,12 @@ def process_message(
     # Safety check
     ai_response = safe_response(raw_response)
 
-    # Extract vocabulary introduced
-    vocab_items = extract_vocab_from_response(ai_response)
+    # Only extract vocabulary during the dedicated vocabulary phase,
+    # not from casual conversation (opening/core/closing/quiz)
+    if phase == "vocabulary":
+        vocab_items = extract_vocab_from_response(ai_response)
+    else:
+        vocab_items = []
     vocab_words = [v["word"] for v in vocab_items]
 
     # Detect grammar corrections (simple recast detection)
