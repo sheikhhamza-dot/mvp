@@ -1,8 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
-import { api } from '@/lib/api'
+import { api, getToken } from '@/lib/api'
 import { Child, ConversationMessage, TopicId } from '@/lib/types'
 import MicrophoneButton from '@/components/MicrophoneButton'
 import ConversationView from '@/components/ConversationView'
@@ -58,10 +57,7 @@ export default function SessionPage() {
 
   // Auth check
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) router.push('/login')
-    })
+    if (!getToken()) { router.push('/login'); return }
     api.children.get(childId).then(setChild).catch(console.error)
 
     // Load voices (required in some browsers)

@@ -1,23 +1,36 @@
-import { createClient } from './supabase'
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-async function getToken(): Promise<string> {
-  const supabase = createClient()
-  const { data } = await supabase.auth.getSession()
-  return data.session?.access_token || ''
+export function getToken(): string {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem('token') || ''
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const token = await getToken()
+export function setToken(token: string) {
+  localStorage.setItem('token', token)
+}
+
+export function clearToken() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+}
+
+export function getUser(): { id: string; name: string; email: string } | null {
+  if (typeof window === 'undefined') return null
+  const raw = localStorage.getItem('user')
+  return raw ? JSON.parse(raw) : null
+}
+
+export function setUser(user: { id: string; name: string; email: string }) {
+  localStorage.setItem('user', JSON.stringify(user))
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken()
   const res = await fetch(`${API_URL}/api${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   })
@@ -28,9 +41,14 @@ async function request<T>(
   return res.json()
 }
 
-// ── Children ─────────────────────────────────────────────────────────────────
-
 export const api = {
+  auth: {
+    signup: (data: { email: string; password: string; name: string; language?: string }) =>
+      request<any>('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
+    login: (data: { email: string; password: string }) =>
+      request<any>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  },
+
   children: {
     list: () => request<any[]>('/children'),
     get: (id: string) => request<any>(`/children/${id}`),
@@ -40,13 +58,9 @@ export const api = {
     }) => request<any>('/children', { method: 'POST', body: JSON.stringify(data) }),
   },
 
-  // ── Sessions ───────────────────────────────────────────────────────────────
   sessions: {
     start: (child_id: string, topic: string) =>
-      request<any>('/sessions/start', {
-        method: 'POST',
-        body: JSON.stringify({ child_id, topic }),
-      }),
+      request<any>('/sessions/start', { method: 'POST', body: JSON.stringify({ child_id, topic }) }),
     message: (session_id: string, content: string) =>
       request<any>(`/sessions/${session_id}/message`, {
         method: 'POST',
@@ -54,34 +68,27 @@ export const api = {
       }),
     end: (session_id: string, reason = 'completed') =>
       request<any>(`/sessions/${session_id}/end`, {
-        method: 'POST',
-        body: JSON.stringify({ reason }),
+        method: 'POST', body: JSON.stringify({ reason }),
       }),
     list: (child_id: string) => request<any[]>(`/sessions/${child_id}/list`),
     transcript: (session_id: string) => request<any>(`/sessions/${session_id}/transcript`),
     report: (session_id: string) => request<any>(`/sessions/${session_id}/report`),
   },
 
-  // ── Vocabulary ─────────────────────────────────────────────────────────────
   vocabulary: {
     get: (child_id: string, sort = 'date', limit = 50, offset = 0) =>
       request<any>(`/vocabulary/${child_id}?sort=${sort}&limit=${limit}&offset=${offset}`),
   },
 
-  // ── Progress ───────────────────────────────────────────────────────────────
   progress: {
     get: (child_id: string) => request<any>(`/progress/${child_id}`),
     weekly: (child_id: string, week?: string) =>
       request<any>(`/progress/${child_id}/weekly${week ? `?week=${week}` : ''}`),
   },
 
-  // ── Goals ──────────────────────────────────────────────────────────────────
   goals: {
     list: (child_id: string) => request<any[]>(`/goals/${child_id}`),
     create: (child_id: string, type: string, target: number) =>
-      request<any>('/goals', {
-        method: 'POST',
-        body: JSON.stringify({ child_id, type, target }),
-      }),
+      request<any>('/goals', { method: 'POST', body: JSON.stringify({ child_id, type, target }) }),
   },
 }

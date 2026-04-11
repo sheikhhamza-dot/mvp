@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase'
 import { api } from '@/lib/api'
 import { Child, Progress, WeeklyProgress, SessionSummary } from '@/lib/types'
 import Navbar from '@/components/Navbar'
@@ -25,10 +24,9 @@ export default function ChildProgressPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) router.push('/login')
-    })
+    if (typeof window !== 'undefined' && !localStorage.getItem('token')) {
+      router.push('/login')
+    }
     Promise.all([
       api.children.get(id),
       api.progress.get(id),

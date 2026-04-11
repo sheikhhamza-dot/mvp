@@ -6,7 +6,8 @@
       "Bash(git commit -m ':*)",
       "Bash(git remote:*)",
       "Bash(git branch:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(powershell -Command \"Stop-Process -Name uvicorn -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; Write-Host 'Stopped old uvicorn'\")"
     ]
   }
 }

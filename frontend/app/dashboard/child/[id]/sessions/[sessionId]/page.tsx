@@ -2,8 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase'
-import { api } from '@/lib/api'
+import { api, getToken } from '@/lib/api'
 import Navbar from '@/components/Navbar'
 import SessionReport from '@/components/SessionReport'
 import { formatDate, formatDuration } from '@/lib/utils'
@@ -20,10 +19,7 @@ export default function SessionDetailPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) router.push('/login')
-    })
+    if (!getToken()) { router.push('/login'); return }
     Promise.all([
       api.sessions.report(sessionId),
       api.sessions.transcript(sessionId),

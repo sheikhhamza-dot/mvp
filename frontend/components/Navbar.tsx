@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
+import { clearToken } from '@/lib/api'
 
 interface Props {
   userName?: string
@@ -10,9 +10,8 @@ interface Props {
 export default function Navbar({ userName }: Props) {
   const router = useRouter()
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+  const handleLogout = () => {
+    clearToken()
     router.push('/login')
   }
 
@@ -24,13 +23,8 @@ export default function Navbar({ userName }: Props) {
           <span className="font-bold text-gray-800 text-lg hidden sm:block">English Coach</span>
         </Link>
         <div className="flex items-center gap-4">
-          {userName && (
-            <span className="text-sm text-gray-500 hidden sm:block">Hi, {userName}!</span>
-          )}
-          <button
-            onClick={handleLogout}
-            className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
-          >
+          {userName && <span className="text-sm text-gray-500 hidden sm:block">Hi, {userName}!</span>}
+          <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
             Log out
           </button>
         </div>
