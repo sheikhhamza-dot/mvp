@@ -13,33 +13,6 @@ const TOPICS = [
   { emoji: '💻', label: 'Technology' },
 ]
 
-const TESTIMONIALS = [
-  {
-    name: 'Priya Sharma',
-    role: 'Mother of Aryan, 11',
-    initials: 'PS',
-    color: 'from-pink-400 to-rose-500',
-    text: 'My son was terrified of speaking English in class. After just 3 weeks with Lily, he presented in front of 40 students without hesitation. I cried happy tears.',
-    stars: 5,
-  },
-  {
-    name: 'Wei Chen',
-    role: 'Father of Mei, 9',
-    initials: 'WC',
-    color: 'from-blue-400 to-indigo-500',
-    text: 'We tried private tutors but Mei was too nervous. With Lily she speaks freely — there\'s no judgment. Her vocabulary has doubled in 2 months.',
-    stars: 5,
-  },
-  {
-    name: 'Fatima Al-Hassan',
-    role: 'Mother of Omar, 13',
-    initials: 'FA',
-    color: 'from-emerald-400 to-teal-500',
-    text: 'The parent reports are incredibly detailed. I know exactly which words Omar learned each session and how his grammar is improving. Worth every penny.',
-    stars: 5,
-  },
-]
-
 const FEATURES = [
   { emoji: '🎙️', title: 'Real Voice Conversations', desc: 'Tap and speak — Lily listens, responds, and adapts in real time.' },
   { emoji: '🧠', title: 'Personalised to Your Child', desc: 'Lily remembers topics, level, and past sessions. Every conversation feels tailored.' },
@@ -50,10 +23,10 @@ const FEATURES = [
 ]
 
 const STATS = [
-  { value: '12,000+', label: 'Kids Learning' },
-  { value: '4.9 ★', label: 'Parent Rating' },
+  { value: '8–14', label: 'Age Range' },
+  { value: '15 min', label: 'Per Session' },
   { value: '50+', label: 'Countries' },
-  { value: '3 min', label: 'Avg. Setup Time' },
+  { value: '3 min', label: 'Setup Time' },
 ]
 
 export default function LandingPage() {
@@ -74,7 +47,6 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
             <a href="#how" className="hover:text-blue-600 transition-colors">How it works</a>
             <a href="#topics" className="hover:text-blue-600 transition-colors">Topics</a>
-            <a href="#testimonials" className="hover:text-blue-600 transition-colors">Reviews</a>
             <a href="#pricing" className="hover:text-blue-600 transition-colors">Pricing</a>
           </div>
           <div className="hidden md:flex items-center gap-3">
@@ -105,7 +77,7 @@ export default function LandingPage() {
           {/* Left: copy */}
           <div>
             <div className="inline-flex items-center gap-2 bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold px-4 py-1.5 rounded-full mb-6 uppercase tracking-widest">
-              🏆 Trusted by 12,000+ families worldwide
+              🏆 AI-Powered English for Ages 8–14
             </div>
             <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-5">
               Your child speaks
@@ -341,33 +313,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Testimonials ──────────────────────────────── */}
-      <section id="testimonials" className="max-w-5xl mx-auto px-4 py-20">
-        <div className="text-center mb-14">
-          <p className="text-blue-600 text-sm font-bold uppercase tracking-widest mb-2">Real Families, Real Results</p>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900">Parents love what they see</h2>
-          <div className="flex justify-center gap-1 mt-3 text-yellow-400 text-xl">★★★★★</div>
-          <p className="text-gray-400 text-sm mt-1">4.9/5 from 2,400+ reviews</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-6">
-          {TESTIMONIALS.map(t => (
-            <div key={t.name} className="bg-white border-2 border-gray-100 rounded-3xl p-6 hover:shadow-xl transition-shadow">
-              <div className="flex text-yellow-400 text-sm mb-4">{'★'.repeat(t.stars)}</div>
-              <p className="text-gray-700 leading-relaxed text-sm mb-6">"{t.text}"</p>
-              <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${t.color} flex items-center justify-center text-white text-xs font-bold`}>
-                  {t.initials}
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900 text-sm">{t.name}</p>
-                  <p className="text-gray-400 text-xs">{t.role}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* ── Pricing ───────────────────────────────────── */}
       <section id="pricing" className="bg-gray-50 py-20">
         <div className="max-w-4xl mx-auto px-4">
@@ -441,7 +386,7 @@ export default function LandingPage() {
             className="inline-block bg-gradient-to-r from-orange-400 to-pink-500 hover:from-orange-500 hover:to-pink-600 text-white font-extrabold text-xl px-10 py-5 rounded-2xl transition-all shadow-2xl hover:shadow-orange-500/30 hover:scale-105">
             Start Free Trial Now 🚀
           </Link>
-          <p className="text-blue-400 text-sm mt-4">Join 12,000+ families · Set up in under 3 minutes</p>
+          <p className="text-blue-400 text-sm mt-4">No credit card required · Set up in under 3 minutes</p>
         </div>
       </section>
 
