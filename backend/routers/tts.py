@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tts", tags=["tts"])
 
-VOICE = "en-US-AnaNeural"  # child voice — energetic young girl
-RATE = "+15%"              # slightly faster: radio-host pace
+VOICE = "en-US-AriaNeural"  # most natural expressive female voice
+RATE = "+5%"               # slightly brisk, natural conversational pace
 
 
 @router.get("")
