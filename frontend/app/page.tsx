@@ -25,7 +25,6 @@ const FEATURES = [
 const STATS = [
   { value: '8–14', label: 'Age Range' },
   { value: '15 min', label: 'Per Session' },
-  { value: '50+', label: 'Countries' },
   { value: '3 min', label: 'Setup Time' },
 ]
 
@@ -190,24 +189,12 @@ export default function LandingPage() {
 
         {/* Stats bar */}
         <div className="border-t border-white/10 bg-white/5 backdrop-blur">
-          <div className="max-w-6xl mx-auto px-4 py-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="max-w-6xl mx-auto px-4 py-5 grid grid-cols-3 gap-4">
             {STATS.map(s => (
               <div key={s.label} className="text-center">
                 <p className="text-2xl md:text-3xl font-extrabold text-white">{s.value}</p>
                 <p className="text-blue-300 text-xs mt-0.5">{s.label}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Logos / As seen in ────────────────────────── */}
-      <section className="bg-gray-50 py-8 border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-4 text-center">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5">Loved by families from</p>
-          <div className="flex flex-wrap justify-center gap-6 md:gap-10 text-gray-400 font-bold text-sm">
-            {['🇮🇳 India', '🇨🇳 China', '🇸🇦 Saudi Arabia', '🇵🇰 Pakistan', '🇧🇩 Bangladesh', '🇰🇷 South Korea'].map(c => (
-              <span key={c} className="hover:text-gray-600 transition-colors">{c}</span>
             ))}
           </div>
         </div>
