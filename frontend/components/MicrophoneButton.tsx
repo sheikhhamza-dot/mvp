@@ -20,7 +20,9 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
   const [state, setState] = useState<State>('idle')
   const [error, setError] = useState<string | null>(null)
   const [interim, setInterim] = useState('')
+
   const recognitionRef = useRef<any>(null)
+  const finalTranscriptRef = useRef('')  // accumulates all final text while listening
 
   const isSupported =
     typeof window !== 'undefined' &&
@@ -38,6 +40,24 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
     return () => recognitionRef.current?.stop()
   }, [])
 
+  const stopListening = useCallback(() => {
+    // Null out the ref first so onend knows we stopped intentionally
+    const recognition = recognitionRef.current
+    recognitionRef.current = null
+    recognition?.stop()
+
+    const text = finalTranscriptRef.current.trim()
+    finalTranscriptRef.current = ''
+    setInterim('')
+
+    if (text) {
+      setState('processing')
+      onTranscript(text)
+    } else {
+      setState('idle')
+    }
+  }, [onTranscript])
+
   const startListening = useCallback(() => {
     if (!isSupported) {
       setError('Voice not supported in this browser. Please use Chrome or Edge.')
@@ -45,12 +65,13 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
     }
     setError(null)
     setInterim('')
+    finalTranscriptRef.current = ''
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     const recognition = new SpeechRecognition()
     recognitionRef.current = recognition
 
-    recognition.continuous = false
+    recognition.continuous = true      // keep listening through pauses
     recognition.interimResults = true
     recognition.lang = 'en-US'
     recognition.maxAlternatives = 1
@@ -59,46 +80,60 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
 
     recognition.onresult = (event: any) => {
       let interimText = ''
-      let finalText = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript
         if (event.results[i].isFinal) {
-          finalText += transcript
+          finalTranscriptRef.current += transcript + ' '
         } else {
           interimText += transcript
         }
       }
-      if (interimText) setInterim(interimText)
-      if (finalText) {
-        setState('processing')
-        setInterim('')
-        onTranscript(finalText.trim())
-      }
+      // Show interim text or the accumulated final text as live feedback
+      setInterim(interimText || finalTranscriptRef.current.trim())
     }
 
     recognition.onerror = (event: any) => {
-      setState('idle')
       if (event.error === 'not-allowed') {
         setError('Microphone permission denied. Please allow microphone access.')
+        setState('idle')
+        recognitionRef.current = null
       } else if (event.error === 'no-speech') {
-        setError('No speech detected. Try again!')
+        // no-speech is not a real error in continuous mode — just ignore it
       } else if (event.error !== 'aborted') {
-        setError('Something went wrong. Please try again.')
+        // Unexpected error — salvage whatever was captured
+        const text = finalTranscriptRef.current.trim()
+        finalTranscriptRef.current = ''
+        setInterim('')
+        recognitionRef.current = null
+        if (text) {
+          setState('processing')
+          onTranscript(text)
+        } else {
+          setError('Something went wrong. Please try again.')
+          setState('idle')
+        }
       }
     }
 
     recognition.onend = () => {
-      if (state === 'listening') setState('idle')
+      // If recognitionRef is still set, the browser ended it (timeout/error),
+      // not us — send whatever was captured
+      if (recognitionRef.current !== null) {
+        recognitionRef.current = null
+        const text = finalTranscriptRef.current.trim()
+        finalTranscriptRef.current = ''
+        setInterim('')
+        if (text) {
+          setState('processing')
+          onTranscript(text)
+        } else {
+          setState('idle')
+        }
+      }
     }
 
     recognition.start()
-  }, [isSupported, onTranscript, state])
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop()
-    setState('idle')
-    setInterim('')
-  }, [])
+  }, [isSupported, onTranscript])
 
   const handleClick = () => {
     if (disabled || state === 'processing') return
@@ -124,7 +159,7 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
             'bg-gray-400 cursor-not-allowed',
           disabled && 'bg-gray-300 cursor-not-allowed opacity-60',
         )}
-        aria-label={state === 'listening' ? 'Stop listening' : 'Start speaking'}
+        aria-label={state === 'listening' ? 'Tap to send' : 'Tap to speak'}
       >
         {state === 'listening' && (
           <>
@@ -138,6 +173,11 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
             <svg className="w-8 h-8 text-white animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : state === 'listening' ? (
+            // Stop / send icon when listening
+            <svg className="w-9 h-9 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
             </svg>
           ) : (
             <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -154,7 +194,7 @@ export default function MicrophoneButton({ onTranscript, disabled }: Props) {
         state === 'processing' && 'text-blue-500',
       )}>
         {state === 'idle' && (disabled ? 'Wait for Lily...' : 'Tap to speak')}
-        {state === 'listening' && 'Listening...'}
+        {state === 'listening' && 'Tap again when done'}
         {state === 'processing' && 'Thinking...'}
       </p>
 
